@@ -205,9 +205,20 @@
           <option>MAIL</option><option>WHATSAPP</option><option>TELÉFONO</option>
           <option>INSTAGRAM</option><option>PÁGINA WEB</option>
           <option>ESPONTÁNEA/MOSTRADOR</option><option>VISITA A CLIENTE</option>
-          <option>AMAFRA LEADS</option>
         </select></label>
       <label class="f">Monto cotizado<input id="eMonto" inputmode="numeric"></label>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:#fdf6ea;border:1px solid var(--line);border-radius:8px">
+      <label style="font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="eEsCampania" style="width:auto;margin:0;cursor:pointer">
+        <span><b>¿Esta consulta viene de una campaña?</b></span>
+      </label>
+      <label class="f" id="wrapCampania" style="display:none;margin-top:8px">¿Cuál?
+        <select id="eCampania">
+          <option value="">— elegir campaña —</option>
+          <option>AMAFRA LEADS</option>
+        </select>
+      </label>
     </div>
     <div class="row2">
       <label class="f">Fecha de ingreso<input id="eFIngreso" type="date"></label>
@@ -563,6 +574,9 @@ function openNueva(){
   document.getElementById('editTitulo').textContent="Nueva consulta";
   ['eDenom','eContacto','eEmail','eTel','eDetalle','eMonto','eFReco','eFCierre','eMotivoTxt','eObs'].forEach(id=>document.getElementById(id).value="");
   document.getElementById('eCanal').value="MAIL";
+  document.getElementById('eEsCampania').checked=false;
+  document.getElementById('eCampania').value="";
+  toggleCampania();
   document.getElementById('eAccion').value="A COTIZAR";
   document.getElementById('eResultado').value="PENDIENTE";
   const hoy=new Date().toISOString().slice(0,10);
@@ -584,6 +598,10 @@ function openEdit(fila){
   document.getElementById('eMonto').value=d["Monto cotizado"]||"";
   document.getElementById('eObs').value=d["Observaciones"]||"";
   document.getElementById('eCanal').value=d.Canal||"MAIL";
+  const camp=(d["Campaña"]||"").trim();
+  document.getElementById('eEsCampania').checked=!!camp;
+  document.getElementById('eCampania').value=camp;
+  toggleCampania();
   document.getElementById('eAccion').value=(d["Acción"]||"A COTIZAR").toUpperCase();
   document.getElementById('eResultado').value=(d.Resultado||"PENDIENTE").toUpperCase();
   document.getElementById('eFIngreso').value=fechaLimpia(d["Fecha de pedido"]);
@@ -598,6 +616,13 @@ function openEdit(fila){
   toggleMotivo();
   modalEdit.style.display='flex';
 }
+function toggleCampania(){
+  const marcado=document.getElementById('eEsCampania').checked;
+  document.getElementById('wrapCampania').style.display=marcado?'block':'none';
+  if(!marcado)document.getElementById('eCampania').value="";
+}
+document.getElementById('eEsCampania').addEventListener('change',toggleCampania);
+
 function toggleMotivo(){
   const esNV=document.getElementById('eResultado').value==="NO VENTA";
   document.getElementById('wrapMotivo').style.display=esNV?'block':'none';
@@ -623,6 +648,7 @@ document.getElementById('editGuardar').addEventListener('click',async()=>{
     "Detalle cotizado":document.getElementById('eDetalle').value.trim(),
     "Monto cotizado":document.getElementById('eMonto').value.trim(),
     "Canal":document.getElementById('eCanal').value,
+    "Campaña":document.getElementById('eEsCampania').checked?document.getElementById('eCampania').value:"",
     "Resultado":document.getElementById('eResultado').value,
     "Email":document.getElementById('eEmail').value.trim(),
     "Teléfono":document.getElementById('eTel').value.trim(),
@@ -669,6 +695,17 @@ function renderStats(){
   let montoV=0;filas.forEach(d=>{if((d.Resultado||"").toUpperCase()==="VENTA"){const m=Number(d["Monto cotizado"]);if(!isNaN(m))montoV+=m;}});
   const canL={},canV={};
   filas.forEach(d=>{const c=d.Canal||"SIN DATO";canL[c]=(canL[c]||0)+1;if((d.Resultado||"").toUpperCase()==="VENTA")canV[c]=(canV[c]||0)+1;});
+  // Campañas: consultas y ventas por campaña, más el comparativo campaña vs espontáneo
+  const campL={},campV={};
+  let conCamp=0,conCampV=0,sinCamp=0,sinCampV=0;
+  filas.forEach(d=>{
+    const c=(d["Campaña"]||"").trim();
+    const esVenta=(d.Resultado||"").toUpperCase()==="VENTA";
+    if(c){
+      campL[c]=(campL[c]||0)+1; if(esVenta)campV[c]=(campV[c]||0)+1;
+      conCamp++; if(esVenta)conCampV++;
+    }else{ sinCamp++; if(esVenta)sinCampV++; }
+  });
   const fmt=n=>"$ "+Number(n).toLocaleString('es-AR');
   const card=(v,l,col)=>`<div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:24px;font-weight:700;color:${col||'var(--ink)'}">${v}</div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-top:2px">${l}</div></div>`;
   const barra=(o,o2)=>{const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);const mx=Math.max(...ks.map(k=>o[k]),1);
@@ -685,6 +722,21 @@ function renderStats(){
       <div style="font-size:26px;font-weight:700;color:var(--green);margin-top:2px">${fmt(montoV)}</div></div>
     <h3 style="font-size:14px;color:var(--craft-dark);margin:0 0 10px">Canales (llegada y conversión)</h3>
     <div style="margin-bottom:22px">${barra(canL,canV)}</div>
+    ${conCamp>0?`
+    <h3 style="font-size:14px;color:var(--craft-dark);margin:0 0 10px">Campañas</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="flex:1;min-width:150px;background:#fdf6ea;border:1px solid var(--craft);border-radius:10px;padding:12px">
+        <div style="font-size:20px;font-weight:700;color:var(--craft-dark)">${conCamp} <span style="font-size:13px;font-weight:400">consultas</span></div>
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">Desde campañas</div>
+        <div style="font-size:12px;margin-top:4px">${conCampV} venta(s) · <b>${conCamp>0?Math.round(conCampV/conCamp*100):0}%</b> conversión</div>
+      </div>
+      <div style="flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px">
+        <div style="font-size:20px;font-weight:700;color:var(--slate)">${sinCamp} <span style="font-size:13px;font-weight:400">consultas</span></div>
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">Sin campaña</div>
+        <div style="font-size:12px;margin-top:4px">${sinCampV} venta(s) · <b>${sinCamp>0?Math.round(sinCampV/sinCamp*100):0}%</b> conversión</div>
+      </div>
+    </div>
+    <div style="margin-bottom:22px">${barra(campL,campV)}</div>`:''}
     <h3 style="font-size:14px;color:var(--craft-dark);margin:0 0 6px">Tipo de respuesta</h3><div>${resList}</div>`;
 }
 
