@@ -105,6 +105,9 @@
     color:var(--slate);font-size:12px}
 
   /* Saludo */
+  .campBadge{display:inline-block;padding:1px 6px;border-radius:20px;font-size:10px;
+    font-weight:700;background:#e8dff5;color:#5a3f96;white-space:nowrap;cursor:help;
+    border:1px solid #d5c8ec;margin-left:2px}
   .saludo{margin-bottom:16px}
   .saludo .hola{font-size:18px;font-weight:600;color:var(--craft-dark)}
   .saludo .fecha{font-size:13px;color:var(--slate);text-transform:capitalize}
@@ -407,6 +410,14 @@ function renderPendientes(){
   }));
 }
 
+function siglaCampania(camp){
+  const c=String(camp||'').trim();
+  if(!c)return '';
+  // Sigla automática: iniciales de cada palabra (AMAFRA LEADS -> AL)
+  const sigla=c.split(/\s+/).map(p=>p[0]).join('').toUpperCase().slice(0,3);
+  return ` <span class="campBadge" title="Campaña: ${c}">📣 ${sigla}</span>`;
+}
+
 function limpiarTel(t){
   // Deja solo dígitos. Para Argentina, arma formato internacional básico.
   let n=String(t||'').replace(/[^\d]/g,'');
@@ -513,7 +524,7 @@ function render(){
       <td data-l="Cliente"><span class="cli" data-edit="${d._fila}">${d.Denominación||''}</span>${d.Contacto?'<div class="muted">'+d.Contacto+'</div>':''}</td>
       <td data-l="Detalle" class="det" data-edit="${d._fila}">${String(d["Detalle cotizado"]||'').slice(0,90)}${String(d["Detalle cotizado"]||'').length>90?'…':''}</td>
       <td data-l="Monto" class="monto">${monto}</td>
-      <td data-l="Canal"><span class="muted">${d.Canal||''}</span></td>
+      <td data-l="Canal"><span class="muted">${d.Canal||''}</span>${siglaCampania(d["Campaña"])}</td>
       <td data-l="Acción">${recon?'⚠ ':''}${accCell}</td>
       <td data-l="Resultado">${resCell}</td>
       <td data-l="Recontactar">${botonesRecontacto(d)||'<span class="muted">—</span>'}</td>
