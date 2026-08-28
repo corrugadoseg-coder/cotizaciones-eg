@@ -111,6 +111,14 @@
   .campBadge{display:inline-block;padding:1px 6px;border-radius:20px;font-size:10px;
     font-weight:700;background:#e8dff5;color:#5a3f96;white-space:nowrap;cursor:help;
     border:1px solid #d5c8ec;margin-left:2px}
+  .sugerencias{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--craft);
+    border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:30;display:none;box-shadow:0 4px 12px rgba(80,55,30,.18)}
+  .sugerencias.abierto{display:block}
+  .sug-item{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0e7d6}
+  .sug-item:last-child{border-bottom:none}
+  .sug-item:hover,.sug-item.activo{background:#fdf3e3}
+  .sug-item .sug-nom{font-weight:600;color:var(--ink)}
+  .sug-item .sug-info{font-size:11px;color:var(--slate);margin-top:1px}
   .saludo{margin-bottom:16px}
   .saludo .hola{font-size:18px;font-weight:600;color:var(--craft-dark)}
   .saludo .fecha{font-size:13px;color:var(--slate);text-transform:capitalize}
@@ -198,7 +206,9 @@
       <button class="btn" id="editClose" style="padding:4px 10px">✕</button>
     </div>
     <div class="row2">
-      <label class="f">Cliente / Denominación<input id="eDenom"></label>
+      <label class="f" style="position:relative">Cliente / Denominación<input id="eDenom" autocomplete="off">
+        <div id="sugerencias" class="sugerencias"></div>
+      </label>
       <label class="f">Contacto<input id="eContacto"></label>
     </div>
     <div class="row2">
@@ -659,6 +669,7 @@ function openNueva(){
 function openEdit(fila){
   const d=DATOS.find(x=>String(x._fila)===String(fila));if(!d)return;
   editFila=fila;
+  cerrarSugerencias();
   document.getElementById('editTitulo').textContent="Editar cotización";
   document.getElementById('eDenom').value=d.Denominación||"";
   document.getElementById('eContacto').value=d.Contacto||"";
@@ -686,8 +697,79 @@ function openEdit(fila){
   toggleMotivo();
   modalEdit.style.display='flex';
 }
-function toggleCampania(){
-  const marcado=document.getElementById('eEsCampania').checked;
+// ---------- AUTOCOMPLETADO DE CLIENTES ----------
+// Arma un índice de clientes con sus datos más recientes
+function indiceClientes(){
+  const idx={};
+  // DATOS ya viene ordenado de más reciente a más antiguo (por el reverse en cargar)
+  DATOS.forEach(d=>{
+    const nom=(d.Denominación||"").trim();
+    if(!nom)return;
+    const clave=nom.toLowerCase();
+    // Como DATOS está de más nuevo a más viejo, el PRIMERO que aparece es el más reciente
+    if(!idx[clave]){
+      idx[clave]={
+        nombre:nom,
+        contacto:d.Contacto||"",
+        email:d.Email||"",
+        telefono:d["Teléfono"]||""
+      };
+    }
+  });
+  return Object.values(idx);
+}
+
+let sugerenciasActivas=[], sugSeleccionada=-1;
+
+function mostrarSugerencias(texto){
+  const cont=document.getElementById('sugerencias');
+  const q=texto.trim().toLowerCase();
+  if(q.length<2){cont.classList.remove('abierto');cont.innerHTML='';sugerenciasActivas=[];return;}
+  const todos=indiceClientes();
+  // Coincidencias que contengan el texto, máximo 8
+  sugerenciasActivas=todos.filter(c=>c.nombre.toLowerCase().includes(q)).slice(0,8);
+  if(!sugerenciasActivas.length){cont.classList.remove('abierto');cont.innerHTML='';return;}
+  sugSeleccionada=-1;
+  cont.innerHTML=sugerenciasActivas.map((c,i)=>{
+    const datos=[c.contacto,c.email,c.telefono].filter(Boolean).join(' · ');
+    return `<div class="sug-item" data-i="${i}"><div class="sug-nom">${c.nombre}</div>${datos?'<div class="sug-info">'+datos+'</div>':''}</div>`;
+  }).join('');
+  cont.classList.add('abierto');
+  cont.querySelectorAll('.sug-item').forEach(el=>el.addEventListener('mousedown',ev=>{
+    ev.preventDefault();
+    elegirSugerencia(Number(el.dataset.i));
+  }));
+}
+
+function elegirSugerencia(i){
+  const c=sugerenciasActivas[i];
+  if(!c)return;
+  document.getElementById('eDenom').value=c.nombre;
+  // Solo completa si el campo está vacío, para no pisar algo que ya escribiste
+  if(!document.getElementById('eContacto').value)document.getElementById('eContacto').value=c.contacto;
+  if(!document.getElementById('eEmail').value)document.getElementById('eEmail').value=c.email;
+  if(!document.getElementById('eTel').value)document.getElementById('eTel').value=c.telefono;
+  cerrarSugerencias();
+}
+function cerrarSugerencias(){
+  const cont=document.getElementById('sugerencias');
+  cont.classList.remove('abierto');cont.innerHTML='';sugerenciasActivas=[];sugSeleccionada=-1;
+}
+
+document.getElementById('eDenom').addEventListener('input',e=>{if(editFila===null)mostrarSugerencias(e.target.value);});
+document.getElementById('eDenom').addEventListener('blur',()=>setTimeout(cerrarSugerencias,150));
+document.getElementById('eDenom').addEventListener('keydown',e=>{
+  const cont=document.getElementById('sugerencias');
+  if(!cont.classList.contains('abierto'))return;
+  const items=cont.querySelectorAll('.sug-item');
+  if(e.key==='ArrowDown'){e.preventDefault();sugSeleccionada=Math.min(sugSeleccionada+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();sugSeleccionada=Math.max(sugSeleccionada-1,0);}
+  else if(e.key==='Enter'&&sugSeleccionada>=0){e.preventDefault();elegirSugerencia(sugSeleccionada);return;}
+  else if(e.key==='Escape'){cerrarSugerencias();return;}
+  items.forEach((el,i)=>el.classList.toggle('activo',i===sugSeleccionada));
+});
+
+function toggleCampania(){  const marcado=document.getElementById('eEsCampania').checked;
   document.getElementById('wrapCampania').style.display=marcado?'block':'none';
   if(!marcado)document.getElementById('eCampania').value="";
 }
