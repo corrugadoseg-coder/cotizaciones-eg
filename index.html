@@ -842,7 +842,8 @@ document.getElementById('editGuardar').addEventListener('click',async()=>{
     "Fecha cierre":document.getElementById('eFCierre').value,
     "Motivo no venta":motivo,
     "Observaciones":document.getElementById('eObs').value.trim(),
-    "Es nueva":"SÍ"
+    "Es nueva":"SÍ",
+    "idUnico": editFila ? "" : ("EG"+Date.now()+Math.floor(Math.random()*10000))
   };
   const btn=document.getElementById('editGuardar');btn.disabled=true;btn.textContent="Guardando…";
   try{
